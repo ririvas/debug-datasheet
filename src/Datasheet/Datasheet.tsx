@@ -4,21 +4,38 @@ import ReactDatasheet from 'react-datasheet';
 import { GridElement } from './GridElement';
 import { RowRenderer } from './RowRenderer';
 import { SheetRenderer } from './SheetRenderer';
-import { CellRenderer } from './CellRenderer';
+import { CellRenderer, CustomCellProps } from './CellRenderer';
+import { SheetContext, connectSheetContext } from './SheetContext';
 
-export interface Props {
-    data: GridElement[][];
+const isRowSelected = (i: number, selection: ReactDatasheet.Selection) => {
+    if (selection === undefined) return false;
+
+    const {start, end} = selection;
+    const posY = (i >= start.i && i <= end.i)
+    const negY = (i <= start.i && i >= end.i)
+
+    return  posY || negY
 }
 
 class TypedRowRender extends RowRenderer<GridElement> {}
 class TypedSheetRenderer extends SheetRenderer<GridElement>{}
 class TypedCellRenderer extends CellRenderer<GridElement>{}
 
+const ConnectedCellRenderer = connectSheetContext<CustomCellProps<GridElement>>((selection, cellProps) => [cellProps.col === 0 && isRowSelected(cellProps.row, selection)])(TypedCellRenderer);
+
+const valueRenderer = (val: GridElement) => val.value;
+const ValueViewer = React.memo((props: ReactDatasheet.ValueViewerProps<GridElement>) => <span>{Math.round(props.value as number).toString()}</span>);
+
+export interface Props {
+    data: GridElement[][];
+}
+
 export const Datasheet: React.SFC<Props> = props => {
     const { data } = props;
     const [storedData, setStoredData] = React.useState(data);
+    const [selection, setSelection] = React.useState<ReactDatasheet.Selection | undefined>();
 
-    const handleCellsChanged: ReactDatasheet.CellsChangedHandler<GridElement> = changes => {
+    const handleCellsChanged: ReactDatasheet.CellsChangedHandler<GridElement> = React.useCallback(changes => {
         const newData = storedData.map(s => s.map(v => v));
         changes.forEach(change => {
             newData[change.row][change.col] = {
@@ -31,35 +48,20 @@ export const Datasheet: React.SFC<Props> = props => {
             console.log('updating sheet state');
             setStoredData(newData);
         }
-    };
+    }, [storedData]);
 
     return (
-        <ReactDatasheet
-            data={storedData}
-            onCellsChanged={handleCellsChanged}
-            valueRenderer={((val, row, col) => { 
-                // console.log(`row: ${row}, col: ${col}`); 
-                return val.value;
-            })}
-            valueViewer={React.memo(props => {
-                console.log('i render');
-                return (<span>{props.value?.toString()}</span>)
-            })}
-            // cellRenderer={props => {
-            //     return <td >
-            //         {props.children}
-            //     </td>
-            // }}
-            // rowRenderer={React.memo(props => {
-            //     console.log(props);
-            //     console.log(props.cells)
-            //     return (
-            //         <tr>{props.children}</tr>
-            //     )
-            // })}
-            cellRenderer={TypedCellRenderer}
-            rowRenderer={TypedRowRender}
-            sheetRenderer={TypedSheetRenderer}
-        />
+        <SheetContext.Provider value={{selection, setSelection}} >
+            <ReactDatasheet
+                data={storedData}
+                onCellsChanged={handleCellsChanged}
+                valueRenderer={valueRenderer}
+                valueViewer={ValueViewer}
+                cellRenderer={ConnectedCellRenderer}
+                rowRenderer={TypedRowRender}
+                sheetRenderer={TypedSheetRenderer}
+                onSelect={setSelection}
+            />
+        </SheetContext.Provider>
     );
 }

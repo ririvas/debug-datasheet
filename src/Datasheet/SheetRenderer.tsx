@@ -7,12 +7,12 @@ export class SheetRenderer<T extends ReactDatasheet.Cell<T>> extends React.PureC
     public render() {
         const { children } = this.props;
 
-        console.log(this.props);
-        console.log(`sheet re-renderd`);
+        // console.log(this.props);
+        // console.log(`sheet re-renderd`);
         return (
             <table className={this.props.className}>
                 <tbody>
-                {this.props.children}
+                {children}
                 </tbody>
             </table>
         )
